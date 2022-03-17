@@ -34,7 +34,6 @@ def init_weights(
 
 def make_optimizers(
     optim: Type[Optimizer],
-    params,
     **kwargs,
 ) -> Generator:
     for k, v in kwargs.items():
@@ -45,10 +44,8 @@ def make_optimizers(
 
     for comb in [dict(zip(keys, v)) for v in product(*values)]:
         yield (
-            optim(
-                params,
-                **comb,
-            ),
+            optim,
+            comb,
             f'{optim.__name__} {", ".join(f"{k}={v}" for k, v in comb.items())}'
         )
 

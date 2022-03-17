@@ -297,10 +297,11 @@ if __name__ == '__main__':
     train_results = []
 
     for setup in optimizers.values():
-        model = make_image_classifier(10).to(device)
-        criterion = nn.CrossEntropyLoss()
+        for optim_type, params, name in make_optimizers(setup['cls'], **setup['params']):
+            model = make_image_classifier(10).to(device)
+            optim = optim_type(model.parameters(), **params)
+            criterion = nn.CrossEntropyLoss()
 
-        for optim, name in make_optimizers(setup['cls'], list(model.parameters()), **setup['params']):
             print(f'running optimizer {name}')
 
             cur_path = base_dir / name

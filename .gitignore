@@ -8,6 +8,10 @@
 data/
 lightning_logs/
 models/
+*.ipynb
+cnn-research/
+mnist/
+test_image_classifier/
 !src/models
 
 # Byte-compiled / optimized / DLL files

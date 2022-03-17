@@ -295,13 +295,20 @@ if __name__ == '__main__':
 
     for setup in optimizers.values():
         for optim_type, params, name in make_optimizers(setup['cls'], **setup['params']):
+            if setup['cls'] == CGNOptimizer:
+                left = name.index(' object')
+                right = name.index('>')
+                real_name = name[:left] + name[right:]
+            else:
+                real_name = name
+
             model = make_image_classifier(10).to(device)
             optim = optim_type(model.parameters(), **params)
             criterion = nn.CrossEntropyLoss()
 
             print(f'running optimizer {name}')
 
-            cur_path = base_dir / name
+            cur_path = base_dir / real_name
 
             if cur_path.exists() and len(list(cur_path.iterdir())) > 0:
                 print(f'optimizer {name} already exists, skipping...')
@@ -329,9 +336,3 @@ if __name__ == '__main__':
                     cur_res,
                     f,
                 )
-
-    with open(base_dir / 'image_classifier.pkl', 'wb') as f:
-        pickle.dump(
-            train_results,
-            f,
-        )

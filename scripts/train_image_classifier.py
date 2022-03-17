@@ -91,6 +91,7 @@ def _train(
             _model,
             _criterion,
             _test_data_loader,
+            _device,
         )
         _accuracy.append(_acc)
         _f1_score.append(_f1)
@@ -156,6 +157,7 @@ def _eval(
     _model: nn.Module,
     _criterion,
     _data_loader: DataLoader,
+    _device: torch.device,
 ) -> Tuple[float, float, float, float, float]:
     _model.eval()
 
@@ -167,28 +169,28 @@ def _eval(
 
     with torch.no_grad():
         for _images, _labels in _data_loader:
-            _images = _images.to(device)
-            _labels = _labels.to(device)
+            _images = _images.to(_device)
+            _labels = _labels.to(_device)
 
             _out = _model(_images)
             _loss.append(criterion(_out, _labels).item())
             _pred = torch.max(_out, 1)[1].data.squeeze()
 
             _acc(
-                _pred,
-                _labels,
+                _pred.cpu(),
+                _labels.cpu(),
             )
             _f1(
-                _pred,
-                _labels,
+                _pred.cpu(),
+                _labels.cpu(),
             )
             _prec(
-                _pred,
-                _labels,
+                _pred.cpu(),
+                _labels.cpu(),
             )
             _rec(
-                _pred,
-                _labels,
+                _pred.cpu(),
+                _labels.cpu(),
             )
 
     _loss = sum(_loss) / len(_loss)
@@ -219,6 +221,11 @@ if __name__ == '__main__':
         type=Path,
         required=True,
     )
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        required=True,
+    )
 
     args = parser.parse_args()
     mnist_root = args.mnist
@@ -238,13 +245,13 @@ if __name__ == '__main__':
     loaders = {
         'train': DataLoader(
             train_data,
-            batch_size=32,
+            batch_size=args.batch_size,
             shuffle=True,
             num_workers=8,
         ),
         'test': DataLoader(
             test_data,
-            batch_size=32,
+            batch_size=args.batch_size,
             shuffle=False,
             num_workers=8,
         ),
@@ -294,6 +301,8 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
 
         for optim, name in make_optimizers(setup['cls'], list(model.parameters()), **setup['params']):
+            print(f'running optimizer {name}')
+
             cur_path = base_dir / name
 
             if cur_path.exists() and len(list(cur_path.iterdir())) > 0:

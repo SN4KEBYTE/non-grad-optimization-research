@@ -1,5 +1,6 @@
 import pickle
 import time
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import (
     List,
@@ -205,14 +206,31 @@ def _eval(
 if __name__ == '__main__':
     seed_everything(1337)
 
+    parser = ArgumentParser()
+    parser.add_argument(
+        '-m',
+        '--mnist',
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        '-o',
+        '--out',
+        type=Path,
+        required=True,
+    )
+
+    args = parser.parse_args()
+    mnist_root = args.mnist
+
     train_data = datasets.MNIST(
-        root='../mnist',
+        root=mnist_root,
         train=True,
         transform=ToTensor(),
         download=True,
     )
     test_data = datasets.MNIST(
-        root='../mnist',
+        root=mnist_root,
         train=False,
         transform=ToTensor()
     )
@@ -233,6 +251,7 @@ if __name__ == '__main__':
     }
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f'using device {device}')
 
     optimizers = {
         'sgd': {
@@ -263,7 +282,7 @@ if __name__ == '__main__':
         },
     }
 
-    base_dir = Path(__file__).parents[1] / 'cnn-research'
+    base_dir = args.out
     base_dir.mkdir(
         exist_ok=True,
         parents=True,
@@ -275,7 +294,9 @@ if __name__ == '__main__':
         criterion = nn.CrossEntropyLoss()
 
         for optim, name in make_optimizers(setup['cls'], list(model.parameters()), **setup['params']):
-            if (base_dir / name).exists():
+            cur_path = base_dir / name
+
+            if cur_path.exists() and len(list(cur_path.iterdir())) > 0:
                 print(f'optimizer {name} already exists, skipping...')
                 continue
 
@@ -291,12 +312,18 @@ if __name__ == '__main__':
                 loaders['test'],
                 25,
                 device,
-                base_dir / name,
+                cur_path,
             )
             cur_res = [name] + list(cur_res)
             train_results.append(cur_res)
 
-    with open('image_classifier.pkl', 'wb') as f:
+            with open(cur_path / 'res.pkl', 'wb') as f:
+                pickle.dump(
+                    cur_res,
+                    f,
+                )
+
+    with open(base_dir / 'image_classifier.pkl', 'wb') as f:
         pickle.dump(
             train_results,
             f,

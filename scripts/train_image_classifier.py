@@ -279,11 +279,8 @@ if __name__ == '__main__':
             'params': {
                 'bp_extension': [
                     extensions.GGNMP(),
-                    extensions.HMP(),
-                    extensions.PCHMP(modify="abs"),
-                    extensions.PCHMP(modify="clip"),
                 ],
-                'maxiter': 1000,
+                'maxiter': [100, 500],
                 'lr': [0.001, 0.01, 0.1],
             }
         },

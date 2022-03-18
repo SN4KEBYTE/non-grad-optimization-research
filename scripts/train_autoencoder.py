@@ -1,5 +1,6 @@
 import pickle
 import time
+from argparse import ArgumentParser
 from pathlib import Path
 
 import torch
@@ -136,7 +137,7 @@ def _eval(
             )
             _losses.append(_loss.item())
 
-    _losses = sum(_loss) / len(_loss)
+    _losses = sum(_losses) / len(_losses)
     _model.train()
 
     return _losses
@@ -145,45 +146,62 @@ def _eval(
 if __name__ == '__main__':
     seed_everything(1337)
 
-    data = torch.load('../data/dataset.pt')
+    parser = ArgumentParser()
+    parser.add_argument(
+        '-d',
+        '--data',
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        '-o',
+        '--out',
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        required=True,
+    )
+    args = parser.parse_args()
+
+    data = torch.load(args.data)
     train_dataloader, val_dataloader = create_dataloaders(
         data,
         test_size=0.1,
-        batch_size=1024,
+        batch_size=args.batch_size,
         seed=1337,
     )
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     optimizers = {
-        # 'sgd': {
-        #     'cls': SGD,
-        #     'params': {
-        #         'lr': [0.001, 0.01, 0.1],
-        #     }
-        # },
-        # 'adamw': {
-        #     'cls': AdamW,
-        #     'params': {
-        #         'amsgrad': [True],
-        #         'lr': [0.001, 0.01, 0.1],
-        #     }
-        # },
+        'sgd': {
+            'cls': SGD,
+            'params': {
+                'lr': [0.001, 0.01, 0.1],
+            }
+        },
+        'adamw': {
+            'cls': AdamW,
+            'params': {
+                'amsgrad': [True],
+                'lr': [0.001, 0.01, 0.1],
+            }
+        },
         'cgn': {
             'cls': CGNOptimizer,
             'params': {
                 'bp_extension': [
                     extensions.GGNMP(),
-                    extensions.HMP(),
-                    extensions.PCHMP(modify="abs"),
-                    extensions.PCHMP(modify="clip"),
                 ],
-                'maxiter': 1000,
+                'maxiter': [100, 500],
                 'lr': [0.001, 0.01, 0.1],
             }
         },
     }
 
-    base_dir = Path(__file__).parents[1] / 'ae-research'
+    base_dir = args.out
     base_dir.mkdir(
         exist_ok=True,
         parents=True,
@@ -191,17 +209,29 @@ if __name__ == '__main__':
     train_results = []
 
     for setup in optimizers.values():
-        model = make_autoencoder().to(device)
-        criterion = nn.MSELoss()
+        for optim_type, params, name in make_optimizers(setup['cls'], **setup['params']):
+            if setup['cls'] == CGNOptimizer:
+                left = name.index(' object')
+                right = name.index('>')
+                real_name = name[:left] + name[right:]
+            else:
+                real_name = name
 
-        for optim, name in make_optimizers(setup['cls'], list(model.parameters()), **setup['params']):
-            if (base_dir / name).exists():
-                print(f'optimizer {name} already exists, skipping...')
+            cur_path = base_dir / real_name
+
+            if cur_path.exists() and len(list(cur_path.iterdir())) > 0:
+                print(f'optimizer {real_name} already exists, skipping...')
                 continue
+
+            model = make_autoencoder().to(device)
+            optim = optim_type(model.parameters(), **params)
+            criterion = nn.MSELoss()
 
             if setup['cls'] == CGNOptimizer:
                 model = extend(model)
                 criterion = extend(criterion)
+
+            print(f'running optimizer {real_name}')
 
             cur_res = _train(
                 model,
@@ -211,12 +241,13 @@ if __name__ == '__main__':
                 val_dataloader,
                 50,
                 device,
-                base_dir / name,
+                cur_path,
             )
+            cur_res = [name] + list(cur_res)
             train_results.append(cur_res)
 
-    with open('image_classifier.pkl', 'wb') as f:
-        pickle.dump(
-            train_results,
-            f,
-        )
+            with open(cur_path / 'res.pkl', 'wb') as f:
+                pickle.dump(
+                    cur_res,
+                    f,
+                )

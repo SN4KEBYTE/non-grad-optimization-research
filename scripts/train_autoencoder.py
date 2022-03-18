@@ -48,13 +48,15 @@ def _train(
     for _epoch in tqdm(range(_num_epochs)):
         _epoch_loss = []
 
-        for i, batch in enumerate(_train_data_loader):
+        for i, _batch in enumerate(_train_data_loader):
+            _batch = _batch.to(_device)
+
             _optimizer.zero_grad()
 
-            _out = model(batch)
+            _out = model(_batch)
             _loss = criterion(
                 _out,
-                batch,
+                _batch,
             )
 
             if isinstance(_optimizer, CGNOptimizer):
@@ -72,6 +74,7 @@ def _train(
             _model,
             _criterion,
             _test_data_loader,
+            _device,
         )
 
         print()
@@ -124,16 +127,19 @@ def _eval(
     _model: nn.Module,
     _criterion,
     _data_loader: DataLoader,
+    _device: torch.device,
 ) -> float:
     _model.eval()
     _losses = []
 
     with torch.no_grad():
-        for i, batch in enumerate(_data_loader):
-            _out = model(batch)
+        for i, _batch in enumerate(_data_loader):
+            _batch = _batch.to(_device)
+
+            _out = model(_batch)
             _loss = criterion(
                 _out,
-                batch,
+                _batch,
             )
             _losses.append(_loss.item())
 
